@@ -1,6 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { faker } = require('@faker-js/faker');
+const { createObjectCsvWriter } = require('csv-writer');
+const path = require('path');
+const fs = require('fs');
 
 // Function to generate fake data
 function generateFakeData(region, errorsPerRecord, seed) {
@@ -114,6 +117,41 @@ router.get('/data', (req, res) => {
 
   const data = generateFakeData(region, errorsPerRecord, seedValue);
   res.json(data);
+});
+
+// Route to export CSV
+router.get('/export-csv', async (req, res) => {
+  const { region, errors, seed } = req.query;
+  const errorsPerRecord = parseFloat(errors);
+  const seedValue = parseInt(seed, 10);
+
+  const data = generateFakeData(region, errorsPerRecord, seedValue);
+
+  const filePath = path.join(__dirname, '../temp/fake_data.csv');
+  const csvWriter = createObjectCsvWriter({
+    path: filePath,
+    header: [
+      { id: 'index', title: 'Index' },
+      { id: 'randomId', title: 'Random ID' },
+      { id: 'name', title: 'Name' },
+      { id: 'address', title: 'Address' },
+      { id: 'phone', title: 'Phone' },
+    ]
+  });
+
+  await csvWriter.writeRecords(data);
+
+  res.download(filePath, 'fake_data.csv', (err) => {
+    if (err) {
+      console.error('Error downloading the file:', err);
+    }
+    // Remove the file after download
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error('Error removing the file:', err);
+      }
+    });
+  });
 });
 
 module.exports = router;
