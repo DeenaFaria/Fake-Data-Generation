@@ -9,37 +9,34 @@ const { fakerEN: fakeren } = require('@faker-js/faker');
 const { fakerPL: fakerpl } = require('@faker-js/faker');
 
 // Function to generate fake data
-// Function to generate fake data
-function generateFakeData(region, errorsPerRecord, seed) {
+function generateFakeData(region, errorsPerRecord, seed, startIndex = 1) {
   faker.seed(seed);  // Set the seed for reproducibility
   
-  // Correct locale setting based on region
   if (region === 'USA') {
     faker.locale = 'en';
   } else if (region === 'Poland') {
     faker.locale = 'pl';
-  } else if (region === 'Georgia') {
+  } else if (region === 'Germany') {
     faker.locale = 'ge';
   } else {
     faker.locale = 'en';  // Default to English if region not specified
   }
 
   const data = [];
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 20; i++) {  // Adjust 20 to the page size
     const randomId = faker.string.uuid();
-    const name = generateName(region);  // Generate region-specific name
-    const address = generateAddress(region);  // Generate region-specific address
-    const phone = generatePhone(region);  // Generate region-specific phone number
+    const name = generateName(region);
+    const address = generateAddress(region);
+    const phone = generatePhone(region);
 
     let record = {
-      index: i + 1,
+      index: startIndex + i,  // Increment index based on starting point
       randomId,
       name,
       address,
       phone
     };
 
-    // Apply errors to the data
     if (errorsPerRecord > 0) {
       record = applyErrors(record, errorsPerRecord);
     }
@@ -49,6 +46,7 @@ function generateFakeData(region, errorsPerRecord, seed) {
 
   return data;
 }
+
 
 // Function to generate names based on region
 function generateName(region) {
@@ -138,14 +136,15 @@ function swapChars(value) {
 
 // Route to get data
 router.get('/data', (req, res) => {
-  const { region, errors, seed } = req.query;
+  const { region, errors, seed, startIndex } = req.query;
   const errorsPerRecord = parseFloat(errors);
   const seedValue = parseInt(seed, 10);
+  const startIdx = parseInt(startIndex, 10) || 1;  // Default to 1 if not provided
 
-  const data = generateFakeData(region, errorsPerRecord, seedValue);
-  console.log(`Region: ${region}`);
+  const data = generateFakeData(region, errorsPerRecord, seedValue, startIdx);
   res.json(data);
 });
+
 
 
 

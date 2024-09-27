@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', function () {
   const exportCsvButton = document.getElementById('export-csv');
 
   let currentPage = 1;
+  let totalRecords=0;
   let loadingData = false;
   let allData = []; // Store all fetched records for infinite scroll
   const pageSize = 20; // Number of records to fetch initially and for each subsequent page
@@ -47,42 +48,40 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Fetch data for the current page
   async function fetchData() {
-    if (loadingData) return; // Prevent multiple calls while loading
-    loadingData = true; // Set loading state
-
+    if (loadingData) return;
+    loadingData = true;
+    loading.style.display = 'block';
+  
     const region = regionSelect.value;
-    const errors = errorsSlider.value; // Get current error amount
+    const errors = errorsSlider.value;
     const seed = seedInput.value;
-
-    loading.style.display = 'block'; // Show loading spinner
-
-    const response = await fetch(`/api/data?region=${region}&errors=${errors}&seed=${seed}&page=${currentPage}&pageSize=${pageSize}`);
-    
+  
+    // Send totalRecords as the starting index for the new page
+    const response = await fetch(`/api/data?region=${region}&errors=${errors}&seed=${seed}&startIndex=${totalRecords + 1}`);
+  
     if (!response.ok) {
       console.error('Failed to fetch data', response);
       loading.style.display = 'none';
       loadingData = false;
       return;
     }
-
+  
     const data = await response.json();
-    
     loading.style.display = 'none';
-
+  
     if (data.length === 0) {
-      console.warn('No more data available');
       loadingData = false;
       return;
     }
-
-    // Append newly fetched data to the existing data array
-    allData = allData.concat(data); 
-
-    updateDisplayedData(); // Apply errors and display all the data
-
-    currentPage++; // Increment page for next load
-    loadingData = false; // Reset loading state
+  
+    totalRecords += data.length;  // Update totalRecords count
+    allData = allData.concat(data);
+  
+    updateDisplayedData();
+    currentPage++;
+    loadingData = false;
   }
+
 
   // Update displayed data and apply errors
   function updateDisplayedData() {
@@ -103,41 +102,56 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Function to apply errors to each record
-  function applyErrors(data, errorCount) {
-    return data.map(record => {
-      let newRecord = { ...record }; // Copy the record
-      const fields = ['name', 'address', 'phone']; // Fields to apply errors to
+// Function to apply errors to each record
+function applyErrors(data, errorCount) {
+  return data.map(record => {
+    let newRecord = { ...record }; // Copy the record
+    const fields = ['name', 'address', 'phone']; // Fields to apply errors to
 
-      // Apply a number of errors based on the slider value
-      for (let i = 0; i < errorCount; i++) {
-        const errorType = Math.floor(Math.random() * 3); // 3 types of errors: delete, add, swap
-        const randomField = fields[Math.floor(Math.random() * fields.length)]; // Randomly pick a field (name, address, or phone)
-        const fieldValue = newRecord[randomField];
-        
-        if (fieldValue.length === 0) continue; // Skip empty values
+    // Apply a number of errors based on the slider value
+    for (let i = 0; i < errorCount; i++) {
+      const randomField = fields[Math.floor(Math.random() * fields.length)]; // Randomly pick a field
+      const fieldValue = newRecord[randomField];
 
-        const randomIndex = Math.floor(Math.random() * fieldValue.length); // Random index for error application
-        switch (errorType) {
-          case 0: // Delete character
+      if (fieldValue.length === 0) continue; // Skip empty values
+
+      const randomIndex = Math.floor(Math.random() * fieldValue.length); // Random index for error application
+      const errorType = Math.floor(Math.random() * 3); // 3 types of errors
+
+      switch (errorType) {
+        case 0: // Delete character
+          // Ensure the field doesn't become empty
+          if (fieldValue.length > 1) {
             newRecord[randomField] = fieldValue.slice(0, randomIndex) + fieldValue.slice(randomIndex + 1);
-            break;
-          case 1: // Add character
-            const charToAdd = String.fromCharCode(97 + Math.floor(Math.random() * 26)); // Random lowercase letter
-            newRecord[randomField] = fieldValue.slice(0, randomIndex) + charToAdd + fieldValue.slice(randomIndex);
-            break;
-          case 2: // Swap characters
-            if (randomIndex < fieldValue.length - 1) {
-              const nextChar = fieldValue[randomIndex + 1];
-              newRecord[randomField] = fieldValue.slice(0, randomIndex) + nextChar + fieldValue[randomIndex] + fieldValue.slice(randomIndex + 2);
-            }
-            break;
-        }
+          } else {
+            newRecord[randomField] = ''; // Set to empty if the field becomes empty
+          }
+          break;
+
+        case 1: // Add character
+          const charToAdd = String.fromCharCode(97 + Math.floor(Math.random() * 26)); // Random lowercase letter
+          newRecord[randomField] = fieldValue.slice(0, randomIndex) + charToAdd + fieldValue.slice(randomIndex);
+          break;
+
+        case 2: // Swap characters
+          if (randomIndex < fieldValue.length - 1) { // Ensure there's a next character to swap with
+            const nextChar = fieldValue[randomIndex + 1];
+            newRecord[randomField] = fieldValue.slice(0, randomIndex) + nextChar + fieldValue[randomIndex] + fieldValue.slice(randomIndex + 2);
+          }
+          break;
       }
 
-      return newRecord;
-    });
-  }
+      // Adjust errorCount dynamically based on field length
+      // If the modified string is empty, break out of the loop
+      if (newRecord[randomField].length === 0) {
+        break;
+      }
+    }
+
+    return newRecord;
+  });
+}
+
 
   // Handle infinite scrolling: Load more records when reaching the bottom
   window.addEventListener('scroll', () => {
